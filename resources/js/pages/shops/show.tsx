@@ -86,7 +86,7 @@ export default function ShopShow({ shop, burgers, comments }: Props) {
 
     return (
         <>
-            <Head title={`${shop.name} - Cariburger`} />
+            <Head title={`${shop.name} - Cari Burger`} />
 
             <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
                 {/* Hero */}

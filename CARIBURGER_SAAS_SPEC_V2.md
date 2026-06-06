@@ -1,7 +1,7 @@
-# 🍔 Cariburger SaaS - Production System Spec (v2)
+# 🍔 Cari Burger SaaS - Production System Spec (v2)
 
 ## 🎯 Overview
-Cariburger is a location-based burger discovery platform where users can explore burger shops on a live map, filter by distance, and see real-time shop status (open/closed). Owners manage shops, while admin controls approval.
+Cari Burger is a location-based burger discovery platform where users can explore burger shops on a live map, filter by distance, and see real-time shop status (open/closed). Owners manage shops, while admin controls approval.
 
 ---
 
@@ -196,4 +196,4 @@ Based on:
 
 ## 📌 Vision
 
-Turn Cariburger into a **map-first food discovery platform for Malaysia**, starting with burgers, focusing on real-world location interaction, social discovery, and trust-based listings.
+Turn Cari Burger into a **map-first food discovery platform for Malaysia**, starting with burgers, focusing on real-world location interaction, social discovery, and trust-based listings.

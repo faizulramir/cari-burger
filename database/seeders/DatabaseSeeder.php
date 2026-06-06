@@ -14,14 +14,14 @@ class DatabaseSeeder extends Seeder
         // Create admin
         User::factory()->create([
             'name' => 'Admin',
-            'email' => 'admin@cariburger.test',
+            'email' => 'admin@Cari Burger.test',
             'role' => 'admin',
         ]);
 
         // Sample owner
         $owner = User::factory()->create([
             'name' => 'Ahmad Burger',
-            'email' => 'owner@cariburger.test',
+            'email' => 'owner@Cari Burger.test',
             'role' => 'owner',
         ]);
 

@@ -177,7 +177,7 @@ export default function Welcome() {
 
     return (
         <>
-            <Head title="Cariburger - Discover Burger Shops" />
+            <Head title="Cari Burger - Discover Burger Shops" />
             <div className="relative h-screen w-screen overflow-hidden bg-stone-900">
                 {/* Map */}
                 <div className="absolute inset-0 z-0">
@@ -256,7 +256,7 @@ export default function Welcome() {
                         <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-1">
                             <Link href="/" className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white/95 px-3 py-2 text-stone-800 shadow-lg backdrop-blur sm:gap-2 sm:px-4 sm:py-2.5">
                                 <span className="text-xl sm:text-2xl">🍔</span>
-                                <span className="text-base font-bold text-[#c2410c] sm:text-lg">Cariburger</span>
+                                <span className="text-base font-bold text-[#c2410c] sm:text-lg">Cari Burger</span>
                             </Link>
 
                             {/* Search — hidden on mobile (moved to bottom) */}

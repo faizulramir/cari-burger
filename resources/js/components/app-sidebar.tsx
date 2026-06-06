@@ -58,7 +58,7 @@ export function AppSidebar() {
 
     const footerNavItems: NavItem[] = [
         {
-            title: 'Cariburger',
+            title: 'Cari Burger',
             href: '/',
             icon: FolderGit2,
         },
