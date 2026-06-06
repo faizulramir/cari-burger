@@ -87,7 +87,31 @@ export default function Welcome() {
     const [mapCenter, setMapCenter] = useState<[number, number]>([3.139, 101.6869]); // KL default
     const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
     const [showDistanceModal, setShowDistanceModal] = useState(false);
+    const [locating, setLocating] = useState(false);
     const searchTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+    // Compute stats from shops
+    const stats = {
+        open: shops.filter(s => s.status === 'open').length,
+        closed: shops.filter(s => s.status === 'closed').length,
+        closingSoon: shops.filter(s => s.status === 'closing_soon').length,
+    };
+
+    const locateMe = () => {
+        if (!('geolocation' in navigator)) return;
+        setLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const loc: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+                setUserLocation(loc);
+                setMapCenter(loc);
+                setLocating(false);
+                fetchShops(search || undefined, loc[0], loc[1]);
+            },
+            () => { setLocating(false); },
+            { enableHighAccuracy: true, timeout: 8000 }
+        );
+    };
 
     // Get user location
     useEffect(() => {
@@ -163,6 +187,17 @@ export default function Welcome() {
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
                         <MapUpdater center={mapCenter} zoom={14} />
+                        {/* Radius circle */}
+                        <Circle
+                            center={mapCenter}
+                            radius={distance * 1000}
+                            pathOptions={{
+                                color: '#f97316',
+                                fillColor: '#f97316',
+                                fillOpacity: 0.08,
+                                weight: 2,
+                            }}
+                        />
                         {shops.map((shop) => (
                             <Marker
                                 key={shop.id}
@@ -253,6 +288,15 @@ export default function Welcome() {
                                 />
                             </div>
 
+                            {/* Locate me — desktop */}
+                            <button
+                                onClick={locateMe}
+                                disabled={locating}
+                                className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/95 shadow-lg backdrop-blur text-base"
+                            >
+                                {locating ? <Spinner className="h-3.5 w-3.5" /> : '📍'}
+                            </button>
+
                             {/* Auth buttons */}
                             <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
                                 {user ? (
@@ -289,20 +333,47 @@ export default function Welcome() {
                     </div>
                 </header>
 
-                {/* Mobile search + distance button */}
-                <div className="absolute bottom-3 left-2 right-2 z-10 flex items-center gap-2 sm:hidden">
-                    <Input
-                        placeholder="🔍 Find a burger shop..."
-                        value={search}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        className="h-10 flex-1 rounded-xl border-0 bg-white/95 text-sm text-stone-800 placeholder:text-stone-400 shadow-lg backdrop-blur"
-                    />
-                    <button
-                        onClick={() => setShowDistanceModal(true)}
-                        className="flex h-10 shrink-0 items-center gap-1 rounded-xl bg-white/95 px-3 text-xs font-medium text-stone-700 shadow-lg backdrop-blur"
-                    >
-                        📏 {distance}km
-                    </button>
+                {/* Mobile stats + search + buttons */}
+                <div className="absolute bottom-2 left-2 right-2 z-10 flex flex-col gap-2 sm:hidden">
+                    {/* Stats panel */}
+                    <div className="flex items-center gap-2 rounded-xl bg-white/95 px-3 py-2 shadow-lg backdrop-blur">
+                        <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-green-500" />
+                            <span className="text-[11px] font-semibold text-stone-700">{stats.open}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-amber-500" />
+                            <span className="text-[11px] font-semibold text-stone-700">{stats.closingSoon}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-red-500" />
+                            <span className="text-[11px] font-semibold text-stone-700">{stats.closed}</span>
+                        </div>
+                        <span className="ml-auto text-[10px] text-stone-400">within {distance}km</span>
+                    </div>
+
+                    {/* Search + buttons row */}
+                    <div className="flex items-center gap-2">
+                        <Input
+                            placeholder="🔍 Find a burger shop..."
+                            value={search}
+                            onChange={(e) => handleSearch(e.target.value)}
+                            className="h-10 flex-1 rounded-xl border-0 bg-white/95 text-sm text-stone-800 placeholder:text-stone-400 shadow-lg backdrop-blur"
+                        />
+                        <button
+                            onClick={() => setShowDistanceModal(true)}
+                            className="flex h-10 shrink-0 items-center gap-1 rounded-xl bg-white/95 px-2.5 text-xs font-medium text-stone-700 shadow-lg backdrop-blur"
+                        >
+                            📏 {distance}
+                        </button>
+                        <button
+                            onClick={locateMe}
+                            disabled={locating}
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/95 shadow-lg backdrop-blur text-lg"
+                        >
+                            {locating ? <Spinner className="h-4 w-4" /> : '📍'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Distance modal overlay */}
@@ -369,6 +440,28 @@ export default function Welcome() {
                     </div>
                 </div>
 
+                {/* Stats — desktop bottom right */}
+                <div className="absolute bottom-6 right-6 z-10 hidden sm:block">
+                    <div className="flex items-center gap-3 rounded-2xl bg-white/95 px-4 py-3 text-sm shadow-lg backdrop-blur">
+                        <span className="flex items-center gap-1.5">
+                            <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                            <span className="font-semibold text-stone-700">{stats.open}</span>
+                            <span className="text-stone-400">open</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                            <span className="font-semibold text-stone-700">{stats.closingSoon}</span>
+                            <span className="text-stone-400">soon</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                            <span className="font-semibold text-stone-700">{stats.closed}</span>
+                            <span className="text-stone-400">closed</span>
+                        </span>
+                        <span className="ml-2 text-xs text-stone-400">within {distance}km</span>
+                    </div>
+                </div>
+
                 {/* Empty state */}
                 {!loading && shops.length === 0 && (
                     <div className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 rounded-2xl bg-white/95 px-6 py-4 text-center shadow-lg backdrop-blur">
@@ -379,4 +472,5 @@ export default function Welcome() {
                 )}
             </div>
         </>
- 
+    );
+}
