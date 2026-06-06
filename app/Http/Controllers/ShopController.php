@@ -53,19 +53,31 @@ class ShopController extends Controller
      */
     public function mapData(Request $request): \Illuminate\Http\JsonResponse
     {
-        $shops = Shop::approved()
-            ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%"))
-            ->get()
-            ->map(fn ($shop) => [
-                'id' => $shop->id,
-                'name' => $shop->name,
-                'lat' => $shop->lat,
-                'lng' => $shop->lng,
-                'address' => $shop->address,
-                'status' => $shop->statusLabel(),
-                'image' => $shop->image,
-                'rating' => $shop->averageRating(),
-            ]);
+        $query = Shop::approved()
+            ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%"));
+
+        // Filter by distance if lat/lng/distance provided
+        if ($request->has('lat') && $request->has('lng') && $request->has('distance')) {
+            $lat = (float) $request->lat;
+            $lng = (float) $request->lng;
+            $radiusKm = (float) $request->distance;
+
+            $query->whereRaw(
+                '(6371 * acos(cos(radians(?)) * cos(radians(lat)) * cos(radians(lng) - radians(?)) + sin(radians(?)) * sin(radians(lat)))) <= ?',
+                [$lat, $lng, $lat, $radiusKm]
+            );
+        }
+
+        $shops = $query->get()->map(fn ($shop) => [
+            'id' => $shop->id,
+            'name' => $shop->name,
+            'lat' => $shop->lat,
+            'lng' => $shop->lng,
+            'address' => $shop->address,
+            'status' => $shop->statusLabel(),
+            'image' => $shop->image,
+            'rating' => $shop->averageRating(),
+        ]);
 
         return response()->json($shops);
     }

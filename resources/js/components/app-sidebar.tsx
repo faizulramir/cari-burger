@@ -21,6 +21,9 @@ export function AppSidebar() {
     const { auth } = usePage().props;
     const user = auth.user as User | null;
 
+    // Hide sidebar for unauthenticated users (public browsing)
+    if (!user) return null;
+
     const mainNavItems: NavItem[] = [
         {
             title: 'Dashboard',

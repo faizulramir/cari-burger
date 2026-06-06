@@ -24,15 +24,23 @@ class GoogleAuthController
     {
         $googleUser = Socialite::driver('google')->stateless()->user();
 
+        $adminEmail = env('ADMIN_EMAIL');
+
         $user = User::updateOrCreate(
             ['google_id' => $googleUser->getId()],
             [
                 'name' => $googleUser->getName(),
                 'email' => $googleUser->getEmail(),
                 'avatar' => $googleUser->getAvatar(),
+                'role' => $adminEmail && strtolower($googleUser->getEmail()) === strtolower($adminEmail) ? 'admin' : 'user',
                 'password' => bcrypt(\Illuminate\Support\Str::random(32)),
             ]
         );
+
+        // Always update role on login in case admin email was added later
+        if ($adminEmail && strtolower($googleUser->getEmail()) === strtolower($adminEmail) && ! $user->isAdmin()) {
+            $user->update(['role' => 'admin']);
+        }
 
         Auth::login($user, true);
 

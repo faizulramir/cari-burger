@@ -16,10 +16,7 @@ class HandleAppearance
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Force light mode on public pages
-        $isPublic = $request->path() === '/' || str_starts_with($request->path(), 'shops');
-
-        View::share('appearance', $isPublic ? 'light' : $request->cookie('appearance') ?? 'light');
+        View::share('appearance', 'light');
 
         return $next($request);
     }
