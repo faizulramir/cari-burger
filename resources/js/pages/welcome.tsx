@@ -12,6 +12,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
+// Delete default Leaflet icon fix — we use custom markers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: markerIcon2x,
@@ -19,25 +20,42 @@ L.Icon.Default.mergeOptions({
     shadowUrl: markerShadow,
 });
 
+function markerHtml(color: string): string {
+    return `
+        <div style="
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: ${color};
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            border: 3px solid white;
+        ">
+            <img src="/burger-marker.svg" alt="" style="width: 22px; height: 22px;" />
+        </div>`;
+}
+
 const openIcon = new L.DivIcon({
     className: 'custom-marker',
-    html: `<div style="background:#22c55e;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35)"></div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
+    html: markerHtml('#22c55e'),
+    iconSize: [46, 46],
+    iconAnchor: [23, 23],
+    popupAnchor: [0, -26],
 });
 
 const closedIcon = new L.DivIcon({
     className: 'custom-marker',
-    html: `<div style="background:#ef4444;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35)"></div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
+    html: markerHtml('#ef4444'),
+    iconSize: [46, 46],
+    iconAnchor: [23, 23],
+    popupAnchor: [0, -26],
 });
 
 const closingSoonIcon = new L.DivIcon({
     className: 'custom-marker',
-    html: `<div style="background:#f59e0b;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35)"></div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
+    html: markerHtml('#f59e0b'),
+    iconSize: [46, 46],
+    iconAnchor: [23, 23],
+    popupAnchor: [0, -26],
 });
 
 interface ShopMarker {
@@ -268,7 +286,7 @@ export default function Welcome() {
                         {/* Logo + Search row — desktop: logo+search, mobile: logo+legend */}
                         <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-1">
                             <Link href="/" className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white/95 px-3 py-2 text-stone-800 shadow-lg backdrop-blur sm:gap-2 sm:px-4 sm:py-2.5">
-                                <span className="text-xl sm:text-2xl">🍔</span>
+                                <img src="/burger-marker.svg" alt="" className="h-5 w-5 sm:h-6 sm:w-6" />
                                 <span className="text-base font-bold text-[#c2410c] sm:text-lg">Cari Burger</span>
                             </Link>
 
