@@ -93,6 +93,19 @@ export default function Welcome() {
     const distanceRef = useRef(distance);
     distanceRef.current = distance;
 
+    // Lock body scroll on mobile
+    useEffect(() => {
+        const original = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        return () => {
+            document.body.style.overflow = original;
+            document.body.style.position = '';
+            document.body.style.width = '';
+        };
+    }, []);
+
     // Compute stats from shops (guard against non-array)
     const stats = {
         open: Array.isArray(shops) ? shops.filter(s => s.status === 'open').length : 0,
@@ -178,7 +191,7 @@ export default function Welcome() {
     return (
         <>
             <Head title="Cari Burger - Discover Burger Shops" />
-            <div className="relative h-screen w-screen overflow-hidden bg-stone-900">
+            <div className="fixed inset-0 overflow-hidden bg-stone-900">
                 {/* Map */}
                 <div className="absolute inset-0 z-0">
                     {loading && (
