@@ -371,7 +371,7 @@ export default function Welcome() {
                             placeholder="🔍 Find a burger shop..."
                             value={search}
                             onChange={(e) => handleSearch(e.target.value)}
-                            className="h-10 flex-1 rounded-xl border-0 bg-white/95 text-sm text-stone-800 placeholder:text-stone-400 shadow-lg backdrop-blur"
+                            className="h-10 flex-1 rounded-xl border-0 bg-white/95 text-base text-stone-800 placeholder:text-stone-400 shadow-lg backdrop-blur"
                         />
                         <button
                             onClick={() => setShowDistanceModal(true)}
