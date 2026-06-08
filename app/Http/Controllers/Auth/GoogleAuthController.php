@@ -42,7 +42,14 @@ class GoogleAuthController
             $user->update(['role' => 'admin']);
         }
 
+        $isNewUser = $user->wasRecentlyCreated;
+
         Auth::login($user, true);
+
+        // New non-admin users go to onboarding
+        if ($isNewUser && ! $user->isAdmin()) {
+            return redirect()->route('onboarding');
+        }
 
         return redirect()->intended(
             $user->isAdmin() ? '/admin' : '/dashboard'

@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\Auth\OnboardingController;
 use App\Http\Controllers\Owner\BurgerController;
 use App\Http\Controllers\Owner\ShopController;
+use App\Http\Controllers\Owner\ShopWizardController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\ShopController as PublicShopController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +24,14 @@ Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->
 // ── Authenticated ──
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
+
+    // Onboarding (first-time role selection)
+    Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding');
+    Route::post('/onboarding/choose', [OnboardingController::class, 'store'])->name('onboarding.choose');
+
+    // Shop wizard (from onboarding "Burger Shop Owner" choice)
+    Route::inertia('/onboarding/wizard', 'onboarding/wizard')->name('onboarding.wizard');
+    Route::post('/owner/wizard/create', [ShopWizardController::class, 'store'])->name('owner.wizard.create');
 
     // Comments
     Route::post('/shops/{shop}/comments', [PublicShopController::class, 'storeComment'])->name('comments.store');

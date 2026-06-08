@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid, Store, MapPin, Settings } from 'lucide-react';
+import { LayoutGrid, Store, MapPin, Settings, UserPlus, FolderGit2 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -45,6 +45,13 @@ export function AppSidebar() {
                 title: 'Admin Panel',
                 href: '/admin',
                 icon: Settings,
+            },
+        ] : []),
+        ...(user?.role === 'user' ? [
+            {
+                title: 'Join as Owner',
+                href: '/onboarding',
+                icon: UserPlus,
             },
         ] : []),
         ...(user?.role === 'owner' ? [
