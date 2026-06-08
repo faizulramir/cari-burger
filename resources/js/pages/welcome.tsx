@@ -334,7 +334,7 @@ export default function Welcome() {
                 </header>
 
                 {/* Mobile stats + search + buttons */}
-                <div className="absolute bottom-2 left-2 right-2 z-10 flex flex-col gap-2 sm:hidden">
+                <div className="absolute bottom-0 left-2 right-2 z-10 flex flex-col gap-2 pb-6 sm:hidden" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom, 16px))' }}>
                     {/* Stats panel */}
                     <div className="flex items-center gap-2 rounded-xl bg-white/95 px-3 py-2 shadow-lg backdrop-blur">
                         <div className="flex items-center gap-1.5">
