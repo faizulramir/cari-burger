@@ -14,18 +14,16 @@ export default function ShopWizardFlow() {
         previous,
         renderStep,
         currentStep,
-        context,
     } = useOnboarding<ShopWizardContext>();
 
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [stepValid, setStepValid] = useState(true);
 
     const handleNext = useCallback(() => {
         if (isSubmitting) return;
         const isLast = (state?.currentStepNumber ?? 0) === (state?.totalSteps ?? 1);
         if (isLast) {
             setIsSubmitting(true);
-            const fd = context?.flowData || {};
+            const fd = state?.context?.flowData || {};
             const shopName = (fd.shop_name as any)?.name || '';
             const address = (fd.shop_address as any)?.address || '';
             const lat = (fd.shop_address as any)?.lat || 3.139;
@@ -53,7 +51,7 @@ export default function ShopWizardFlow() {
             return;
         }
         next();
-    }, [next, context, isSubmitting, state]);
+    }, [next, state, isSubmitting]);
 
     if (!state) {
         return (
@@ -77,20 +75,6 @@ export default function ShopWizardFlow() {
     const totalSteps = state.totalSteps ?? 1;
     const currentIndex = (state.currentStepNumber ?? 1) - 1;
 
-    // Clone the rendered step and intercept onDataChange to track validity
-    const stepContent = renderStep();
-    const enhancedContent = stepContent && typeof stepContent === 'object' && 'props' in stepContent
-        ? {
-            ...(stepContent as any),
-            props: {
-                ...(stepContent as any).props,
-                onDataChange: (_data: unknown, isValid: boolean) => {
-                    setStepValid(isValid);
-                },
-            },
-        }
-        : stepContent;
-
     return (
         <div className="flex min-h-screen bg-gradient-to-b from-amber-50 to-white">
             <div className="mx-auto flex w-full max-w-lg flex-col px-4 py-8">
@@ -110,7 +94,7 @@ export default function ShopWizardFlow() {
 
                 {/* Step content */}
                 <div className="flex-1">
-                    {enhancedContent}
+                    {renderStep()}
                 </div>
 
                 {/* Navigation */}
