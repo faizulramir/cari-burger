@@ -218,11 +218,11 @@ function HoursStep({ onDataChange }: StepComponentProps<any, ShopWizardContext>)
 // ── Step 5: Review ──
 function ReviewStep({ context }: StepComponentProps<any, ShopWizardContext>) {
     const fd = context.flowData;
-    const name = fd.shop_name as string || '';
-    const address = fd.shop_address as string || '';
-    const phone = fd.shop_phone as string || '';
-    const description = fd.shop_description as string || '';
-    const hours = (fd.shop_hours as Record<string, any>) || {};
+    const name = fd.name as string || '';
+    const address = fd.address as string || '';
+    const phone = fd.phone as string || '';
+    const description = fd.description as string || '';
+    const hours = (fd.opening_hours as Record<string, any>) || {};
     const openDays = Object.keys(hours).filter(k => hours[k]);
 
     return (

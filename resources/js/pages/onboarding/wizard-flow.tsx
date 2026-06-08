@@ -24,13 +24,13 @@ export default function ShopWizardFlow() {
         if (isLast) {
             setIsSubmitting(true);
             const fd = state?.context?.flowData || {};
-            const shopName = (fd.shop_name as any)?.name || '';
-            const address = (fd.shop_address as any)?.address || '';
-            const lat = (fd.shop_address as any)?.lat || 3.139;
-            const lng = (fd.shop_address as any)?.lng || 101.6869;
-            const phone = (fd.shop_details as any)?.phone || '';
-            const description = (fd.shop_details as any)?.description || '';
-            const openingHours = (fd.shop_hours as any)?.opening_hours || {};
+            const shopName = (fd as any)?.name || '';
+            const address = (fd as any)?.address || '';
+            const lat = (fd as any)?.lat || 3.139;
+            const lng = (fd as any)?.lng || 101.6869;
+            const phone = (fd as any)?.phone || '';
+            const description = (fd as any)?.description || '';
+            const openingHours = (fd as any)?.opening_hours || {};
 
             router.post('/owner/wizard/create', {
                 name: shopName,
