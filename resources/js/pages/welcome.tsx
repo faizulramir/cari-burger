@@ -1,16 +1,20 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Spinner } from '@/components/ui/spinner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 // Fix default marker icons in bundlers
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import MarkerClusterGroup from 'react-leaflet-cluster';
+import ShopDetailModal from '@/components/shop-detail-modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 
 // Delete default Leaflet icon fix — we use custom markers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -67,23 +71,42 @@ interface ShopMarker {
     status: 'open' | 'closed' | 'closing_soon';
     image: string | null;
     rating: number;
+    min_price?: number | null;
 }
 
 function getStatusIcon(status: string) {
-    if (status === 'open') return openIcon;
-    if (status === 'closing_soon') return closingSoonIcon;
+    if (status === 'open') {
+return openIcon;
+}
+
+    if (status === 'closing_soon') {
+return closingSoonIcon;
+}
+
     return closedIcon;
 }
 
 function getStatusColor(status: string) {
-    if (status === 'open') return 'bg-green-500';
-    if (status === 'closing_soon') return 'bg-amber-500';
+    if (status === 'open') {
+return 'bg-green-500';
+}
+
+    if (status === 'closing_soon') {
+return 'bg-amber-500';
+}
+
     return 'bg-red-500';
 }
 
 function getStatusLabel(status: string) {
-    if (status === 'open') return 'Open';
-    if (status === 'closing_soon') return 'Closing Soon';
+    if (status === 'open') {
+return 'Open';
+}
+
+    if (status === 'closing_soon') {
+return 'Closing Soon';
+}
+
     return 'Closed';
 }
 
@@ -92,6 +115,18 @@ function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }
     useEffect(() => {
         map.setView(center, zoom);
     }, [center, zoom, map]);
+
+    return null;
+}
+
+function MapMover({ onMove }: { onMove: (lat: number, lng: number) => void }) {
+    useMapEvents({
+        moveend(e) {
+            const c = e.target.getCenter();
+            onMove(c.lat, c.lng);
+        },
+    });
+
     return null;
 }
 
@@ -102,14 +137,30 @@ export default function Welcome() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [distance, setDistance] = useState(10);
+    const [openNow, setOpenNow] = useState(false);
+    const [maxPrice, setMaxPrice] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
     const [mapCenter, setMapCenter] = useState<[number, number]>([3.139, 101.6869]); // KL default
+    const [searchCenter, setSearchCenter] = useState<[number, number] | null>(null);
+    const [mapMoved, setMapMoved] = useState(false);
     const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
     const [showDistanceModal, setShowDistanceModal] = useState(false);
-    const [selectedShop, setSelectedShop] = useState<ShopMarker | null>(null);
+    const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
     const [locating, setLocating] = useState(false);
     const searchTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
     const distanceRef = useRef(distance);
-    distanceRef.current = distance;
+    const openNowRef = useRef(openNow);
+    const maxPriceRef = useRef(maxPrice);
+
+    useEffect(() => {
+ distanceRef.current = distance; 
+}, [distance]);
+    useEffect(() => {
+ openNowRef.current = openNow; 
+}, [openNow]);
+    useEffect(() => {
+ maxPriceRef.current = maxPrice; 
+}, [maxPrice]);
 
     // Lock body scroll on mobile
     useEffect(() => {
@@ -117,6 +168,7 @@ export default function Welcome() {
         document.body.style.overflow = 'hidden';
         document.body.style.position = 'fixed';
         document.body.style.width = '100%';
+
         return () => {
             document.body.style.overflow = original;
             document.body.style.position = '';
@@ -134,8 +186,10 @@ export default function Welcome() {
     const locateMe = () => {
         if (!('geolocation' in navigator)) {
             alert('Geolocation is not supported by your browser.');
+
             return;
         }
+
         setLocating(true);
         navigator.geolocation.getCurrentPosition(
             (pos) => {
@@ -171,25 +225,40 @@ export default function Welcome() {
 
     const fetchShops = useCallback(async (q?: string, lat?: number, lng?: number, dist?: number) => {
         setLoading(true);
+
         try {
             const d = dist ?? distanceRef.current;
             const params = new URLSearchParams();
-            if (q) params.set('search', q);
+
+            if (q) {
+params.set('search', q);
+}
+
             if (lat != null && lng != null) {
                 params.set('lat', String(lat));
                 params.set('lng', String(lng));
                 params.set('distance', String(d));
             }
+
+            if (openNowRef.current) {
+params.set('open_now', '1');
+}
+
+            if (maxPriceRef.current) {
+params.set('max_price', String(maxPriceRef.current));
+}
+
             const res = await fetch(`/api/shops/map?${params.toString()}`);
             const data = await res.json();
             setShops(Array.isArray(data) ? data : []);
+            setMapMoved(false);
         } catch (e) {
             console.error('Failed to fetch shops', e);
             setShops([]);
         } finally {
             setLoading(false);
         }
-    }, []); // no dependency needed — uses ref for distance
+    }, []); // uses refs for filters
 
     useEffect(() => {
         fetchShops(undefined, mapCenter[0], mapCenter[1]);
@@ -197,14 +266,17 @@ export default function Welcome() {
 
     const handleSearch = useCallback((value: string) => {
         setSearch(value);
-        if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
+        if (searchTimeout.current) {
+clearTimeout(searchTimeout.current);
+}
+
         searchTimeout.current = setTimeout(() => {
             fetchShops(value, mapCenter[0], mapCenter[1]);
         }, 300);
     }, [fetchShops, mapCenter]);
 
     const loginUrl = '/login';
-    const registerUrl = '/register';
 
     return (
         <>
@@ -230,6 +302,9 @@ export default function Welcome() {
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
                         <MapUpdater center={mapCenter} zoom={14} />
+                        <MapMover onMove={(lat, lng) => {
+ setSearchCenter([lat, lng]); setMapMoved(true); 
+}} />
                         {/* Radius circle */}
                         <Circle
                             center={mapCenter}
@@ -241,11 +316,13 @@ export default function Welcome() {
                                 weight: 2,
                             }}
                         />
+                        <MarkerClusterGroup chunkedLoading showCoverageOnHover={false} maxClusterRadius={50}>
                         {shops.map((shop) => (
                             <Marker
                                 key={shop.id}
                                 position={[shop.lat, shop.lng]}
                                 icon={getStatusIcon(shop.status)}
+                                eventHandlers={{ click: () => setSelectedShopId(shop.id) }}
                             >
                                 <Popup>
                                     <div className="min-w-[180px]">
@@ -267,8 +344,11 @@ export default function Welcome() {
                                                 </span>
                                             )}
                                         </div>
+                                        {shop.min_price != null && (
+                                            <p className="mt-1 text-xs text-muted-foreground">from RM {Number(shop.min_price).toFixed(2)}</p>
+                                        )}
                                         <button
-                                            onClick={() => setSelectedShop(shop)}
+                                            onClick={() => setSelectedShopId(shop.id)}
                                             className="mt-2 inline-block w-full rounded-lg bg-primary px-3 py-1.5 text-center text-xs font-medium text-primary-foreground hover:opacity-90"
                                         >
                                             View Details
@@ -277,6 +357,7 @@ export default function Welcome() {
                                 </Popup>
                             </Marker>
                         ))}
+                        </MarkerClusterGroup>
                     </MapContainer>
                 </div>
 
@@ -327,11 +408,19 @@ export default function Welcome() {
                                         const val = Number(e.target.value);
                                         setDistance(val);
                                         distanceRef.current = val;
-                                        fetchShops(search || undefined, mapCenter[0], mapCenter[1]);
                                     }}
+                                    onMouseUp={() => fetchShops(search || undefined, mapCenter[0], mapCenter[1])}
+                                    onTouchEnd={() => fetchShops(search || undefined, mapCenter[0], mapCenter[1])}
                                     className="h-1.5 w-20 accent-primary"
                                 />
                             </div>
+
+                            <button
+                                onClick={() => setShowFilters((v) => !v)}
+                                className={`hidden sm:flex h-9 shrink-0 items-center gap-1 rounded-xl px-3 text-xs font-medium shadow-lg backdrop-blur ${openNow || maxPrice ? 'bg-primary text-primary-foreground' : 'bg-white/95 text-stone-700'}`}
+                            >
+                                ☰ Filters{openNow || maxPrice ? ' •' : ''}
+                            </button>
 
                             {/* Locate me — desktop */}
                             <button
@@ -363,6 +452,57 @@ export default function Welcome() {
                         </div>
                     </div>
                 </header>
+
+                {/* Filter panel */}
+                {showFilters && (
+                    <div className="absolute top-20 left-1/2 z-10 w-[calc(100%-24px)] max-w-md -translate-x-1/2 rounded-2xl bg-white/95 p-4 shadow-xl backdrop-blur sm:left-auto sm:right-6 sm:translate-x-0">
+                        <div className="flex items-center gap-2">
+                            <label className="flex flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-sm">
+                                <input type="checkbox" checked={openNow} onChange={(e) => setOpenNow(e.target.checked)} />
+                                Open now
+                            </label>
+                            <input
+                                type="number"
+                                value={maxPrice}
+                                onChange={(e) => setMaxPrice(e.target.value)}
+                                placeholder="Max RM"
+                                className="h-10 w-28 rounded-xl border px-3 text-sm"
+                            />
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                            <Button
+                                className="flex-1"
+                                onClick={() => {
+ openNowRef.current = openNow; maxPriceRef.current = maxPrice; setShowFilters(false); fetchShops(search || undefined, mapCenter[0], mapCenter[1]); 
+}}
+                            >
+                                Apply filters
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+ setOpenNow(false); setMaxPrice(''); openNowRef.current = false; maxPriceRef.current = ''; setShowFilters(false); fetchShops(search || undefined, mapCenter[0], mapCenter[1]); 
+}}
+                            >
+                                Clear
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Search this area */}
+                {mapMoved && searchCenter && (
+                    <div className="absolute top-24 left-1/2 z-10 -translate-x-1/2 sm:top-20">
+                        <button
+                            onClick={() => {
+ setMapCenter(searchCenter); fetchShops(search || undefined, searchCenter[0], searchCenter[1]); 
+}}
+                            className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-lg"
+                        >
+                            🔍 Search this area
+                        </button>
+                    </div>
+                )}
 
                 {/* Mobile stats + search + buttons */}
                 <div className="absolute bottom-0 left-2 right-2 z-10 flex flex-col gap-2 pb-6 sm:hidden" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom, 16px))' }}>
@@ -396,6 +536,12 @@ export default function Welcome() {
                             className="flex h-10 shrink-0 items-center gap-1 rounded-xl bg-white/95 px-2.5 text-xs font-medium text-stone-700 shadow-lg backdrop-blur"
                         >
                             📏 {distance}
+                        </button>
+                        <button
+                            onClick={() => setShowFilters((v) => !v)}
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-lg backdrop-blur ${openNow || maxPrice ? 'bg-primary text-primary-foreground' : 'bg-white/95'}`}
+                        >
+                            ☰
                         </button>
                         <button
                             onClick={locateMe}
@@ -493,76 +639,8 @@ export default function Welcome() {
                     </div>
                 </div>
 
-                {/* Shop detail modal */}
-                {selectedShop && (
-                    <div className="absolute inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setSelectedShop(null)}>
-                        <div
-                            className="w-full max-w-md rounded-t-2xl bg-white shadow-xl overflow-y-auto max-h-[80vh] sm:rounded-2xl sm:max-h-[85vh]"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {/* Close button */}
-                            <button
-                                onClick={() => setSelectedShop(null)}
-                                className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 sm:top-4 sm:right-4"
-                            >
-                                &times;
-                            </button>
-
-                            {/* Hero image */}
-                            <div className="relative h-48 bg-stone-700">
-                                {selectedShop.image ? (
-                                    <img
-                                        src={`/storage/${selectedShop.image}`}
-                                        alt={selectedShop.name}
-                                        className="h-full w-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="flex h-full items-center justify-center">
-                                        <span className="text-5xl">🍔</span>
-                                    </div>
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                                <div className="absolute bottom-4 left-4">
-                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium text-white ${
-                                        selectedShop.status === 'open' ? 'bg-green-600' : selectedShop.status === 'closing_soon' ? 'bg-amber-600' : 'bg-red-600'
-                                    }`}>
-                                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                                        {getStatusLabel(selectedShop.status)}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="p-5">
-                                <h2 className="text-xl font-bold text-stone-800">{selectedShop.name}</h2>
-                                <p className="mt-1 text-sm text-stone-500">{selectedShop.address}</p>
-
-                                {selectedShop.rating > 0 && (
-                                    <div className="mt-2 flex items-center gap-1 text-amber-500 text-sm">
-                                        {'★'.repeat(Math.round(selectedShop.rating))}{'☆'.repeat(5 - Math.round(selectedShop.rating))}
-                                        <span className="ml-1 text-xs text-stone-400">{selectedShop.rating.toFixed(1)}</span>
-                                    </div>
-                                )}
-
-                                <div className="mt-5 flex gap-3">
-                                    <Link
-                                        href={`/shops/${selectedShop.id}`}
-                                        className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-center text-sm font-semibold text-primary-foreground hover:opacity-90"
-                                    >
-                                        View Full Details
-                                    </Link>
-                                    <a
-                                        href={`https://www.google.com/maps/dir/?api=1&destination=${selectedShop.lat},${selectedShop.lng}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center justify-center gap-1 rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                                    >
-                                        🗺 Navigate
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Shop detail modal — full details, no page change */}
+                <ShopDetailModal shopId={selectedShopId} onClose={() => setSelectedShopId(null)} />
 
                 {/* Empty state */}
                 {!loading && shops.length === 0 && (

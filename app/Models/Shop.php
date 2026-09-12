@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -39,6 +40,16 @@ class Shop extends Model
         return $this->hasMany(Comment::class);
     }
 
+    public function approvedBurgers(): HasMany
+    {
+        return $this->hasMany(Burger::class)->where('status', 'approved');
+    }
+
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
     public function averageRating(): float
     {
         return (float) $this->comments()->avg('rating') ?? 0;
@@ -70,24 +81,56 @@ class Shop extends Model
 
     /**
      * Determine if the shop is currently open based on opening_hours.
+     * Uses Asia/Kuala_Lumpur timezone and handles overnight ranges (e.g. 18:00-02:00).
      */
-    public function isOpen(): bool
+    public function isOpen(?\DateTimeInterface $at = null): bool
     {
         if (! $this->opening_hours) {
             return false;
         }
 
-        $now = now();
+        $now = $at ? Carbon::parse($at)->setTimezone('Asia/Kuala_Lumpur') : now('Asia/Kuala_Lumpur');
         $day = strtolower($now->format('l')); // monday, tuesday, etc.
-        $currentTime = $now->format('H:i');
+        $currentMinutes = $now->hour * 60 + $now->minute;
 
-        $todayHours = $this->opening_hours[$day] ?? null;
-
-        if (! $todayHours || empty($todayHours['open']) || empty($todayHours['close'])) {
-            return false;
+        // Check today's hours plus yesterday's overnight spill-over.
+        foreach ([$day, strtolower($now->copy()->subDay()->format('l'))] as $checkDay) {
+            $hours = $this->opening_hours[$checkDay] ?? null;
+            if (! $hours || empty($hours['open']) || empty($hours['close'])) {
+                continue;
+            }
+            [$open, $close] = [$this->toMinutes($hours['open']), $this->toMinutes($hours['close'])];
+            if ($open === null || $close === null) {
+                continue;
+            }
+            if ($close < $open) {
+                // Overnight range: open day 18:00 -> next day 02:00
+                if ($checkDay === $day && $currentMinutes >= $open) {
+                    return true;
+                }
+                if ($checkDay !== $day && $currentMinutes <= $close) {
+                    return true;
+                }
+            } elseif ($checkDay === $day && $currentMinutes >= $open && $currentMinutes <= $close) {
+                return true;
+            }
         }
 
-        return $currentTime >= $todayHours['open'] && $currentTime <= $todayHours['close'];
+        return false;
+    }
+
+    private function toMinutes(string $time): ?int
+    {
+        if (! preg_match('/^(\d{1,2}):(\d{2})/', trim($time), $m)) {
+            return null;
+        }
+        $h = (int) $m[1];
+        $min = (int) $m[2];
+        if ($h < 0 || $h > 23 || $min < 0 || $min > 59) {
+            return null;
+        }
+
+        return $h * 60 + $min;
     }
 
     /**
@@ -99,13 +142,17 @@ class Shop extends Model
             return 'closed';
         }
 
-        $day = strtolower(now()->format('l'));
-        $currentTime = now();
+        $now = now('Asia/Kuala_Lumpur');
+        $day = strtolower($now->format('l'));
         $closeTime = $this->opening_hours[$day]['close'] ?? null;
 
         if ($closeTime) {
-            $close = now()->setTimeFromTimeString($closeTime);
-            $diffInMinutes = $currentTime->diffInMinutes($close, false);
+            $close = $now->copy()->setTimeFromTimeString($closeTime);
+            // Overnight close belongs to next day
+            if ($close->lessThan($now->copy()->setTimeFromTimeString($this->opening_hours[$day]['open'] ?? '00:00'))) {
+                $close->addDay();
+            }
+            $diffInMinutes = $now->diffInMinutes($close, false);
 
             if ($diffInMinutes <= 60 && $diffInMinutes >= 0) {
                 return 'closing_soon';

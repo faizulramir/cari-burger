@@ -2,16 +2,18 @@
 
 namespace App\Http\Controllers\Owner;
 
+use App\Concerns\StoresImages;
 use App\Http\Controllers\Controller;
 use App\Models\Burger;
 use App\Models\Shop;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\Support\Facades\Storage;
 
 class BurgerController extends Controller
 {
+    use StoresImages;
+
     public function store(Request $request): RedirectResponse
     {
         $shop = Shop::where('user_id', auth()->id())->firstOrFail();
@@ -19,19 +21,20 @@ class BurgerController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'price' => 'required|numeric|min:0',
-            'image' => 'nullable|image|max:2048',
+            'price' => 'required|numeric|min:0|max:9999',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         if ($request->hasFile('image')) {
-            $validated['image'] = $request->file('image')->store('burgers', 'public');
+            $validated['image'] = $this->storeImage($request->file('image'), 'burgers');
         }
 
         $validated['shop_id'] = $shop->id;
+        $validated['status'] = 'pending';
 
         Burger::create($validated);
 
-        return Redirect::back()->with('success', 'Burger added to menu!');
+        return Redirect::back()->with('success', 'Burger added! Pending admin approval.');
     }
 
     public function update(Request $request, Burger $burger): RedirectResponse
@@ -45,20 +48,21 @@ class BurgerController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'price' => 'required|numeric|min:0',
-            'image' => 'nullable|image|max:2048',
+            'price' => 'required|numeric|min:0|max:9999',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         if ($request->hasFile('image')) {
-            if ($burger->image) {
-                Storage::disk('public')->delete($burger->image);
-            }
-            $validated['image'] = $request->file('image')->store('burgers', 'public');
+            $this->deleteImage($burger->image);
+            $validated['image'] = $this->storeImage($request->file('image'), 'burgers');
         }
+
+        // Any edit requires re-approval
+        $validated['status'] = 'pending';
 
         $burger->update($validated);
 
-        return Redirect::back()->with('success', 'Burger updated!');
+        return Redirect::back()->with('success', 'Burger updated! Pending re-approval.');
     }
 
     public function destroy(Burger $burger): RedirectResponse
@@ -68,9 +72,7 @@ class BurgerController extends Controller
             abort(403);
         }
 
-        if ($burger->image) {
-            Storage::disk('public')->delete($burger->image);
-        }
+        $this->deleteImage($burger->image);
 
         $burger->delete();
 

@@ -1,11 +1,11 @@
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { Head, useForm, usePage, router } from '@inertiajs/react';
 import { useState } from 'react';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import InputError from '@/components/input-error';
 import { Spinner } from '@/components/ui/spinner';
 import L from 'leaflet';
 
@@ -36,6 +36,7 @@ interface Burger {
     description: string | null;
     price: string;
     image: string | null;
+    status: string;
 }
 
 interface Props {
@@ -60,6 +61,7 @@ function LocationPicker({ lat, lng, onChange }: { lat: number; lng: number; onCh
             onChange(e.latlng.lat, e.latlng.lng);
         },
     });
+
     return <Marker position={[lat, lng]} draggable eventHandlers={{
         dragend: (e) => {
             const pos = e.target.getLatLng();
@@ -92,6 +94,50 @@ export default function OwnerShopForm({ shop, burgers = [] }: Props) {
     });
 
     const [editingBurger, setEditingBurger] = useState<Burger | null>(null);
+    const [burgerErrors, setBurgerErrors] = useState<Record<string, string>>({});
+
+    const submitBurger = (isUpdate: boolean) => {
+        setBurgerErrors({});
+        const data = new FormData();
+        data.append('name', burgerForm.name);
+        data.append('description', burgerForm.description);
+        data.append('price', burgerForm.price);
+
+        if (burgerForm.image) {
+data.append('image', burgerForm.image);
+}
+
+        if (isUpdate && editingBurger) {
+data.append('_method', 'PATCH');
+}
+
+        const url = isUpdate && editingBurger ? `/owner/burgers/${editingBurger.id}` : '/owner/burgers';
+        router.post(url, data, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setBurgerForm({ name: '', description: '', price: '', image: null });
+                setEditingBurger(null);
+            },
+            onError: (errors) => setBurgerErrors(errors as Record<string, string>),
+        });
+    };
+
+    const deleteBurger = (id: number) => {
+        if (confirm('Remove this burger?')) {
+            router.delete(`/owner/burgers/${id}`, { preserveScroll: true });
+        }
+    };
+
+    const burgerStatusBadge = (status: string) => {
+        const colors: Record<string, string> = {
+            approved: 'bg-green-100 text-green-700',
+            pending: 'bg-amber-100 text-amber-700',
+            rejected: 'bg-red-100 text-red-700',
+        };
+
+        return <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${colors[status] || colors.pending}`}>{status}</span>;
+    };
 
     const updateHours = (day: string, field: 'open' | 'close', value: string) => {
         form.setData('opening_hours', {
@@ -105,6 +151,7 @@ export default function OwnerShopForm({ shop, burgers = [] }: Props) {
 
     const toggleDay = (day: string) => {
         const current = form.data.opening_hours;
+
         if (current[day]) {
             const next = { ...current };
             delete next[day];
@@ -135,6 +182,7 @@ export default function OwnerShopForm({ shop, burgers = [] }: Props) {
             pending: 'bg-amber-100 text-amber-700',
             rejected: 'bg-red-100 text-red-700',
         };
+
         return (
             <span className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${colors[status] || colors.pending}`}>
                 {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -257,6 +305,7 @@ export default function OwnerShopForm({ shop, burgers = [] }: Props) {
                             {Object.entries(dayLabels).map(([day, label]) => {
                                 const hours = form.data.opening_hours[day];
                                 const isOpen = !!hours;
+
                                 return (
                                     <div key={day} className="flex items-center gap-3">
                                         <button
@@ -311,7 +360,7 @@ export default function OwnerShopForm({ shop, burgers = [] }: Props) {
                                                 <span className="text-2xl">🍔</span>
                                             )}
                                             <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-sm">{burger.name}</p>
+                                                <p className="font-medium text-sm flex items-center gap-2">{burger.name} {burgerStatusBadge(burger.status || 'pending')}</p>
                                                 <p className="text-xs text-muted-foreground">
                                                     RM {parseFloat(burger.price).toFixed(2)}
                                                 </p>
@@ -332,12 +381,7 @@ export default function OwnerShopForm({ shop, burgers = [] }: Props) {
                                                     Edit
                                                 </button>
                                                 <button
-                                                    onClick={() => {
-                                                        if (confirm('Remove this burger?')) {
-                                                            const form = useForm({});
-                                                            form.delete(`/owner/burgers/${burger.id}`);
-                                                        }
-                                                    }}
+                                                    onClick={() => deleteBurger(burger.id)}
                                                     className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
                                                 >
                                                     Delete
@@ -351,8 +395,11 @@ export default function OwnerShopForm({ shop, burgers = [] }: Props) {
                             {/* Add/Edit Burger Form */}
                             <div className="rounded-xl border bg-stone-50 p-4">
                                 <h3 className="mb-3 text-sm font-semibold">
-                                    {editingBurger ? 'Edit Burger' : 'Add New Burger'}
+                                    {editingBurger ? 'Edit Burger (will need re-approval)' : 'Add New Burger (needs approval)'}
                                 </h3>
+                                {burgerErrors.name && <p className="mb-2 text-xs text-red-600">{burgerErrors.name}</p>}
+                                {burgerErrors.price && <p className="mb-2 text-xs text-red-600">{burgerErrors.price}</p>}
+                                {burgerErrors.image && <p className="mb-2 text-xs text-red-600">{burgerErrors.image}</p>}
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="sm:col-span-2">
                                         <Label>Name *</Label>
@@ -397,20 +444,7 @@ export default function OwnerShopForm({ shop, burgers = [] }: Props) {
                                         {editingBurger ? (
                                             <>
                                                 <Button
-                                                    onClick={() => {
-                                                        const burgerFormWithFile = new FormData();
-                                                        burgerFormWithFile.append('name', burgerForm.name);
-                                                        burgerFormWithFile.append('description', burgerForm.description);
-                                                        burgerFormWithFile.append('price', burgerForm.price);
-                                                        if (burgerForm.image) burgerFormWithFile.append('image', burgerForm.image);
-                                                        burgerFormWithFile.append('_method', 'PATCH');
-                                                        // We'll submit via a regular form for file uploads
-                                                        const xhr = new XMLHttpRequest();
-                                                        xhr.open('POST', `/owner/burgers/${editingBurger.id}`);
-                                                        xhr.setRequestHeader('X-CSRF-TOKEN', (document.querySelector('meta[name="csrf-token"]') as any)?.content || '');
-                                                        xhr.onload = () => { if (xhr.status === 200) window.location.reload(); };
-                                                        xhr.send(burgerFormWithFile);
-                                                    }}
+                                                    onClick={() => submitBurger(true)}
                                                     className="flex-1 gap-2"
                                                 >
                                                     Update Burger
@@ -427,18 +461,7 @@ export default function OwnerShopForm({ shop, burgers = [] }: Props) {
                                             </>
                                         ) : (
                                             <Button
-                                                onClick={() => {
-                                                    const burgerData = new FormData();
-                                                    burgerData.append('name', burgerForm.name);
-                                                    burgerData.append('description', burgerForm.description);
-                                                    burgerData.append('price', burgerForm.price);
-                                                    if (burgerForm.image) burgerData.append('image', burgerForm.image);
-                                                    const xhr = new XMLHttpRequest();
-                                                    xhr.open('POST', '/owner/burgers');
-                                                    xhr.setRequestHeader('X-CSRF-TOKEN', (document.querySelector('meta[name="csrf-token"]') as any)?.content || '');
-                                                    xhr.onload = () => { if (xhr.status === 200) window.location.reload(); };
-                                                    xhr.send(burgerData);
-                                                }}
+                                                onClick={() => submitBurger(false)}
                                                 className="w-full gap-2"
                                                 disabled={!burgerForm.name || !burgerForm.price}
                                             >

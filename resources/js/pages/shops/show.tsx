@@ -2,9 +2,10 @@ import { Head, Link, usePage, useForm } from '@inertiajs/react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import { useState } from 'react';
 import 'leaflet/dist/leaflet.css';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import InputError from '@/components/input-error';
+import { AuthPrompt } from '@/components/shop-detail-modal';
 
 interface Burger {
     id: number;
@@ -32,8 +33,11 @@ interface Shop {
     opening_hours: Record<string, { open: string; close: string }> | null;
     phone: string | null;
     image: string | null;
+    status: string;
     status_label: string;
     average_rating: number;
+    favorites_count: number;
+    is_favorited: boolean;
 }
 
 interface Props {
@@ -53,21 +57,32 @@ const dayNames: Record<string, string> = {
 };
 
 function getStatusColor(status: string) {
-    if (status === 'open') return 'text-green-600 bg-green-50';
-    if (status === 'closing_soon') return 'text-amber-600 bg-amber-50';
+    if (status === 'open') {
+return 'text-green-600 bg-green-50';
+}
+
+    if (status === 'closing_soon') {
+return 'text-amber-600 bg-amber-50';
+}
+
     return 'text-red-600 bg-red-50';
 }
 
 function getStatusDot(status: string) {
-    if (status === 'open') return 'bg-green-500';
-    if (status === 'closing_soon') return 'bg-amber-500';
+    if (status === 'open') {
+return 'bg-green-500';
+}
+
+    if (status === 'closing_soon') {
+return 'bg-amber-500';
+}
+
     return 'bg-red-500';
 }
 
 export default function ShopShow({ shop, burgers, comments }: Props) {
     const { auth } = usePage().props;
     const user = auth.user as any;
-    const [rating, setRating] = useState(0);
 
     const commentForm = useForm({
         message: '',
@@ -79,9 +94,18 @@ export default function ShopShow({ shop, burgers, comments }: Props) {
             preserveScroll: true,
             onSuccess: () => {
                 commentForm.reset();
-                setRating(0);
             },
         });
+    };
+
+    const favoriteForm = useForm({});
+    const [showAuth, setShowAuth] = useState(false);
+    const toggleFavorite = () => {
+        if (!user) {
+            setShowAuth(true);
+            return;
+        }
+        favoriteForm.post(`/shops/${shop.id}/favorite`, { preserveScroll: true });
     };
 
     return (
@@ -118,15 +142,30 @@ export default function ShopShow({ shop, burgers, comments }: Props) {
                             </div>
                             <h1 className="mt-2 text-3xl font-bold text-white">{shop.name}</h1>
                             <p className="mt-1 text-white/70">{shop.address}</p>
+                            {shop.status !== 'approved' && (
+                                <p className="mt-2 inline-block rounded-full bg-amber-500 px-3 py-1 text-xs font-medium text-white">
+                                    {shop.status === 'pending' ? 'Pending approval — only you can see this' : 'Rejected — only you can see this'}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
 
                 <div className="mx-auto max-w-3xl px-4 py-8">
-                    {/* Back link */}
-                    <Link href="/" className="mb-6 inline-flex items-center gap-1 text-sm text-primary hover:underline">
-                        ← Back to map
-                    </Link>
+                    {/* Back link + favorite */}
+                    <div className="mb-6 flex items-center justify-between">
+                        <Link href="/" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+                            ← Back to map
+                        </Link>
+                        <Button
+                            variant={shop.is_favorited ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={toggleFavorite}
+                            disabled={favoriteForm.processing}
+                        >
+                            {shop.is_favorited ? `♥ Saved (${shop.favorites_count})` : `♡ Save (${shop.favorites_count})`}
+                        </Button>
+                    </div>
 
                     {/* About */}
                     {shop.description && (
@@ -188,6 +227,7 @@ export default function ShopShow({ shop, burgers, comments }: Props) {
                                     const hours = shop.opening_hours?.[key];
                                     const today = new Date().toLocaleString('en-US', { weekday: 'long' }).toLowerCase();
                                     const isToday = key === today;
+
                                     return (
                                         <div
                                             key={key}
@@ -249,12 +289,21 @@ export default function ShopShow({ shop, burgers, comments }: Props) {
                                         <button
                                             key={star}
                                             type="button"
-                                            onClick={() => setRating(star)}
-                                            className={`text-xl ${star <= rating ? 'text-amber-500' : 'text-stone-300'}`}
+                                            onClick={() => commentForm.setData('rating', star)}
+                                            className={`text-xl ${star <= (commentForm.data.rating || 0) ? 'text-amber-500' : 'text-stone-300'}`}
                                         >
                                             ★
                                         </button>
                                     ))}
+                                    {commentForm.data.rating > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => commentForm.setData('rating', 0)}
+                                            className="ml-2 text-xs text-muted-foreground hover:underline"
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
                                 </div>
                                 <Textarea
                                     placeholder="Share your experience..."
@@ -300,7 +349,10 @@ export default function ShopShow({ shop, burgers, comments }: Props) {
                                     No reviews yet. Be the first!
                                 </p>
                             )}
-                            {comments.map((comment) => (
+                            {comments.map((comment) => {
+                                const canDelete = user && (comment as any).user_id === user.id || user?.role === 'admin';
+
+                                return (
                                 <div key={comment.id} className="rounded-xl border p-4">
                                     <div className="flex items-center gap-3 mb-2">
                                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -319,12 +371,30 @@ export default function ShopShow({ shop, burgers, comments }: Props) {
                                         )}
                                     </div>
                                     <p className="text-sm">{comment.message}</p>
+                                    {canDelete && (
+                                        <div className="mt-2 flex justify-end">
+                                            <Link
+                                                href={`/comments/${comment.id}`}
+                                                method="delete"
+                                                as="button"
+                                                className="text-xs text-red-500 hover:underline"
+                                            >
+                                                Delete
+                                            </Link>
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </section>
                 </div>
             </div>
+            {showAuth && (
+                <div className="fixed inset-0 z-50">
+                    <AuthPrompt onClose={() => setShowAuth(false)} action="save favorites" />
+                </div>
+            )}
         </>
     );
 }

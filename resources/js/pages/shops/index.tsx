@@ -1,4 +1,6 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
+import { useState } from 'react';
+import ShopDetailModal from '@/components/shop-detail-modal';
 
 interface Shop {
     id: number;
@@ -21,17 +23,34 @@ interface Props {
         last_page: number;
         links: { url: string | null; label: string; active: boolean }[];
     };
-    filters: { search?: string };
+    filters: { search?: string; open_now?: boolean; max_price?: string; min_rating?: string };
+    favorites?: number[];
 }
 
-export default function ShopsIndex({ shops, filters }: Props) {
+export default function ShopsIndex({ shops, filters, favorites = [] }: Props) {
+    const [search, setSearch] = useState(filters.search || '');
+    const [openNow, setOpenNow] = useState(!!filters.open_now);
+    const [maxPrice, setMaxPrice] = useState(filters.max_price || '');
+    const [minRating, setMinRating] = useState(filters.min_rating || '');
+    const [selectedShopId, setSelectedShopId] = useState<number | null>(null);
+
+    const apply = (overrides: Record<string, unknown> = {}) => {
+        router.get('/shops', {
+            search: search || undefined,
+            open_now: openNow || undefined,
+            max_price: maxPrice || undefined,
+            min_rating: minRating || undefined,
+            ...overrides,
+        }, { preserveState: true, replace: true });
+    };
+
     return (
         <>
             <Head title="Browse Burger Shops" />
             <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
                 <div className="mx-auto max-w-5xl px-4 py-8">
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold flex items-center gap-2">
+                    <div className="mb-6">
+                        <h1 className="flex items-center gap-2 text-3xl font-bold">
                             🍔 Burger Shops
                         </h1>
                         <p className="mt-1 text-muted-foreground">
@@ -42,19 +61,62 @@ export default function ShopsIndex({ shops, filters }: Props) {
                         </Link>
                     </div>
 
+                    {/* Filters */}
+                    <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border bg-white p-4 shadow-sm">
+                        <input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && apply()}
+                            placeholder="Search shops..."
+                            className="h-10 min-w-[160px] flex-1 rounded-xl border px-3 text-sm"
+                        />
+                        <label className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm">
+                            <input type="checkbox" checked={openNow} onChange={(e) => {
+                                setOpenNow(e.target.checked);
+                            }} />
+                            Open now
+                        </label>
+                        <input
+                            type="number"
+                            value={maxPrice}
+                            onChange={(e) => setMaxPrice(e.target.value)}
+                            placeholder="Max RM"
+                            className="h-10 w-28 rounded-xl border px-3 text-sm"
+                        />
+                        <select value={minRating} onChange={(e) => setMinRating(e.target.value)} className="h-10 rounded-xl border px-3 text-sm">
+                            <option value="">Any rating</option>
+                            <option value="4">4★+</option>
+                            <option value="3">3★+</option>
+                        </select>
+                        <button onClick={() => apply()} className="h-10 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground">
+                            Filter
+                        </button>
+                        {(filters.search || filters.open_now || filters.max_price || filters.min_rating) && (
+                            <button
+                                onClick={() => {
+                                    setSearch(''); setOpenNow(false); setMaxPrice(''); setMinRating(''); router.get('/shops', {}, { replace: true });
+                                }}
+                                className="h-10 rounded-xl border px-4 text-sm"
+                            >
+                                Clear
+                            </button>
+                        )}
+                    </div>
+
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         {shops.data.map((shop) => (
-                            <Link
+                            <button
                                 key={shop.id}
-                                href={`/shops/${shop.id}`}
-                                className="group overflow-hidden rounded-2xl bg-white shadow-sm border hover:shadow-md hover:border-primary/30 transition-all"
+                                type="button"
+                                onClick={() => setSelectedShopId(shop.id)}
+                                className="group overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
                             >
-                                <div className="relative h-44 bg-stone-200 overflow-hidden">
+                                <div className="relative h-44 overflow-hidden bg-stone-200">
                                     {shop.image ? (
                                         <img
                                             src={`/storage/${shop.image}`}
                                             alt={shop.name}
-                                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                                         />
                                     ) : (
                                         <div className="flex h-full items-center justify-center">
@@ -72,12 +134,15 @@ export default function ShopsIndex({ shops, filters }: Props) {
                                             {shop.status_label === 'open' ? 'Open' : shop.status_label === 'closing_soon' ? 'Closing Soon' : 'Closed'}
                                         </span>
                                     </div>
+                                    {favorites.includes(shop.id) && (
+                                        <div className="absolute top-3 right-3 rounded-full bg-white/90 px-2 py-1 text-xs">♥</div>
+                                    )}
                                 </div>
                                 <div className="p-4">
-                                    <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
+                                    <h3 className="text-lg font-semibold transition-colors group-hover:text-primary">
                                         {shop.name}
                                     </h3>
-                                    <p className="mt-1 text-sm text-muted-foreground line-clamp-1">
+                                    <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
                                         {shop.address}
                                     </p>
                                     <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
@@ -90,7 +155,7 @@ export default function ShopsIndex({ shops, filters }: Props) {
                                         <span>🍔 {shop.burgers_count} items</span>
                                     </div>
                                 </div>
-                            </Link>
+                            </button>
                         ))}
                     </div>
 
@@ -121,6 +186,8 @@ export default function ShopsIndex({ shops, filters }: Props) {
                     )}
                 </div>
             </div>
+
+            <ShopDetailModal shopId={selectedShopId} onClose={() => setSelectedShopId(null)} />
         </>
     );
 }

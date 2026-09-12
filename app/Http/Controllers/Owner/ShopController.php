@@ -2,18 +2,19 @@
 
 namespace App\Http\Controllers\Owner;
 
+use App\Concerns\StoresImages;
 use App\Http\Controllers\Controller;
-use App\Models\Burger;
 use App\Models\Shop;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ShopController extends Controller
 {
+    use StoresImages;
+
     public function create(): Response
     {
         $existing = Shop::where('user_id', auth()->id())->first();
@@ -33,15 +34,15 @@ class ShopController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
             'address' => 'required|string|max:500',
-            'lat' => 'required|numeric',
-            'lng' => 'required|numeric',
+            'lat' => 'required|numeric|between:-90,90',
+            'lng' => 'required|numeric|between:-180,180',
             'phone' => 'nullable|string|max:20',
             'opening_hours' => 'nullable|array',
-            'image' => 'nullable|image|max:2048',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         if ($request->hasFile('image')) {
-            $validated['image'] = $request->file('image')->store('shops', 'public');
+            $validated['image'] = $this->storeImage($request->file('image'), 'shops');
         }
 
         $validated['user_id'] = auth()->id();
@@ -79,23 +80,27 @@ class ShopController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
             'address' => 'required|string|max:500',
-            'lat' => 'required|numeric',
-            'lng' => 'required|numeric',
+            'lat' => 'required|numeric|between:-90,90',
+            'lng' => 'required|numeric|between:-180,180',
             'phone' => 'nullable|string|max:20',
             'opening_hours' => 'nullable|array',
-            'image' => 'nullable|image|max:2048',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         if ($request->hasFile('image')) {
-            // Delete old image
-            if ($shop->image) {
-                Storage::disk('public')->delete($shop->image);
-            }
-            $validated['image'] = $request->file('image')->store('shops', 'public');
+            $this->deleteImage($shop->image);
+            $validated['image'] = $this->storeImage($request->file('image'), 'shops');
+        }
+
+        // Rejected shops go back to pending on resubmit.
+        if ($shop->status === 'rejected') {
+            $validated['status'] = 'pending';
         }
 
         $shop->update($validated);
 
-        return Redirect::back()->with('success', 'Shop updated!');
+        $msg = $shop->wasChanged('status') ? 'Shop resubmitted for approval!' : 'Shop updated!';
+
+        return Redirect::back()->with('success', $msg);
     }
 }

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Burger extends Model
 {
     protected $fillable = [
-        'shop_id', 'name', 'description', 'price', 'image',
+        'shop_id', 'name', 'description', 'price', 'image', 'status',
     ];
 
     protected function casts(): array
@@ -21,5 +21,10 @@ class Burger extends Model
     public function shop(): BelongsTo
     {
         return $this->belongsTo(Shop::class);
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('status', 'approved');
     }
 }
